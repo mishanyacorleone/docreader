@@ -5,12 +5,14 @@
 import os
 import logging
 from typing import Optional
+from pathlib import Path
 
 import numpy as np
 
 from docreader.config import PipelineConfig
-from docreader.types import DocumentResult, ZoneResult
+from docreader.src.docreader.schemas import DocumentResult, ZoneResult
 from docreader.utils import load_image
+from docreader.hub import ensure_model, get_cache_dir
 from docreader.preprocessing import descew_image, crop_obb_region
 
 from docreader.classifier.base import BaseClassifier
@@ -70,31 +72,57 @@ class DocReader:
 
         self._config = config or PipelineConfig()
         self._device = self._config.resolve_device()
-        self._models_dir = models_dir
+        if models_dir is not None:
+            self._models_dir = Path(models_dir)
+            self._auto_download = False
+        else:
+            self._models_dir = get_cache_dir()
+            self._auto_download = True
 
-        logger.info(f"Inizializing DocReader (device={self._device})")
+        logger.info(f"DocReader init: device={self._device}"
+                    f"models_dir={self._models_dir}"
+                    f"auto_download={self._auto_download}")
 
         self._classifier = classifier or self._default_classifier()
         self._detector = detector or self._default_detector()
         self._ocr = ocr_engine or self._default_ocr()
 
-    # Фабрики компонентов по умолчанию
+    def _resolve_weigths(self, filename: str) -> str:
+        """
+        Возвращает путь к весам, скачивая при необходимости
+        """
+        if self._auto_download:
+            return str(ensure_model(filename, self._models_dir))
+        path = self._models_dir / filename
+        if not path.exists():
+            raise FileNotFoundError(f"Model not found: {path}")
+        return str(path)
+    
+    def _init_classifier(self) -> BaseClassifier:
+        from docreader.classifier.mobilenet import MobileNetClassifier
 
-    def _default_classifier(self) -> MobileNetClassifier:
-        weigths = os.path.join(self._models_dir, self._config.classification_weights)
+        weigths = self._resolve_weigths(self._config.classification_weights)
         return MobileNetClassifier(
-            weigths_path=weigths,
+            weights_path=weigths,
             class_labels=self._config.class_labels,
             device=self._device
         )
     
-    def _default_detector(self) -> YoloObbDetector:
+    def _init_detector(self) -> BaseDetection:
+        from docreader.detector.yolo_obb import YoloObbDetector
+
+        resolved = {}
+        for doc_type, filename in self._config.detector_weights.items():
+            self._resolve_weigths(filename)
+            resolved[doc_type] = filename
+        
         return YoloObbDetector(
-            models_dir=self._models_dir,
-            weights_map=self._config.detector_weights
+            models_dir=str(self._models_dir),
+            weights_map=resolved
         )
 
-    def _default_ocr(self) -> EasyOcrEngine:
+    def _init_ocr(self) -> BaseOcrEngine:
+        from docreader.ocr.easyocr_engine import EasyOcrEngine
         return EasyOcrEngine(lang=["ru"], gpu=(self._device != "cpu"))
     
     # Публичный API

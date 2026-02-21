@@ -1,152 +1,51 @@
-"""
-Автоматическая загрузка и кэширование моделей.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-Модели скачиваются при первом вызове и сохраняются в:
-    ~/.cache/docreader/models/
-"""
+[project]
+name = "docreader"
+version = "0.1.0"
+description = "Document OCR pipeline: classify → detect fields → recognize text"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Mikhail Kardash", email = "mishutqac@mail.com"},
+    {name = "Abzelilov Ruslan", email = "ruslanr26@mail.ru"},
+    {name = "Ekaterina Karmanova", email = "monitor81@mail.ru"}
+]
+keywords = ["ocr", "document", "recognition", "passport", "yolo"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
 
-import os
-import hashlib
-import logging
-from pathlib import Path
-from typing import Optional
+dependencies = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "ultralytics>=8.0",
+    "easyocr>=1.7",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+    "requests>=2.28",
+    "tqdm>=4.65",
+]
 
-import requests
-from tqdm import tqdm
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
 
-logger = logging.getLogger(__name__)
+[project.urls]
+Homepage = "https://github.com/mishanyacorleone/docreader"
+Repository = "https://github.com/mishanyacorleone/docreader"
+Issues = "https://github.com/mishanyacorleone/docreader/issues"
 
-# ── Реестр моделей ──────────────────────────────────────────────
-
-# Базовый URL (GitHub Releases)
-_BASE_URL = "https://github.com/yourname/docreader/releases/download/v0.1.0"
-
-# Реестр: имя файла → (url, sha256)
-MODEL_REGISTRY: dict[str, dict] = {
-    "best_doc_classifier.pth": {
-        "url": f"{_BASE_URL}/best_doc_classifier.pth",
-        "sha256": "abc123...",  # заполнишь реальным хэшем
-        "size_mb": 9.2,
-    },
-    "passport.pt": {
-        "url": f"{_BASE_URL}/passport.pt",
-        "sha256": "def456...",
-        "size_mb": 22.5,
-    },
-    "diplom.pt": {
-        "url": f"{_BASE_URL}/diplom.pt",
-        "sha256": "ghi789...",
-        "size_mb": 22.5,
-    },
-    "attestat.pt": {
-        "url": f"{_BASE_URL}/attestat.pt",
-        "sha256": "jkl012...",
-        "size_mb": 22.5,
-    },
-    "snils_model.pt": {
-        "url": f"{_BASE_URL}/snils_model.pt",
-        "sha256": "mno345...",
-        "size_mb": 22.5,
-    },
-}
-
-# ── Директория кэша ────────────────────────────────────────────
-
-def get_cache_dir() -> Path:
-    """Возвращает директорию кэша моделей."""
-    cache = Path(os.environ.get("DOCREADER_CACHE", "~/.cache/docreader"))
-    cache = cache.expanduser() / "models"
-    cache.mkdir(parents=True, exist_ok=True)
-    return cache
-
-
-# ── Скачивание ──────────────────────────────────────────────────
-
-def _sha256_file(path: Path) -> str:
-    """Считает SHA-256 хэш файла."""
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def _download_file(url: str, dest: Path, expected_sha256: Optional[str] = None):
-    """Скачивает файл с прогресс-баром и проверкой хэша."""
-    logger.info(f"Downloading {url}")
-
-    response = requests.get(url, stream=True, timeout=30)
-    response.raise_for_status()
-
-    total_size = int(response.headers.get("content-length", 0))
-
-    with open(dest, "wb") as f, tqdm(
-        total=total_size,
-        unit="B",
-        unit_scale=True,
-        desc=dest.name,
-    ) as pbar:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-            pbar.update(len(chunk))
-
-    # Проверка целостности
-    if expected_sha256:
-        actual = _sha256_file(dest)
-        if actual != expected_sha256:
-            dest.unlink()
-            raise ValueError(
-                f"Hash mismatch for {dest.name}: "
-                f"expected {expected_sha256[:16]}..., "
-                f"got {actual[:16]}..."
-            )
-
-    logger.info(f"Saved to {dest}")
-
-
-# ── Публичный API ───────────────────────────────────────────────
-
-def ensure_model(filename: str, cache_dir: Optional[Path] = None) -> Path:
-    """
-    Гарантирует наличие файла модели. Скачивает, если отсутствует.
-
-    Args:
-        filename: имя файла из MODEL_REGISTRY.
-        cache_dir: директория кэша (по умолчанию ~/.cache/docreader/models).
-
-    Returns:
-        Путь к файлу модели.
-
-    Raises:
-        KeyError: если файл не зарегистрирован.
-        ConnectionError: если не удалось скачать.
-    """
-    if filename not in MODEL_REGISTRY:
-        raise KeyError(
-            f"Unknown model '{filename}'. "
-            f"Available: {list(MODEL_REGISTRY.keys())}"
-        )
-
-    cache = cache_dir or get_cache_dir()
-    filepath = cache / filename
-
-    if filepath.exists():
-        logger.debug(f"Model cached: {filepath}")
-        return filepath
-
-    meta = MODEL_REGISTRY[filename]
-    _download_file(
-        url=meta["url"],
-        dest=filepath,
-        expected_sha256=meta.get("sha256"),
-    )
-
-    return filepath
-
-
-def ensure_all_models(cache_dir: Optional[Path] = None) -> Path:
-    """Скачивает все модели. Возвращает директорию кэша."""
-    cache = cache_dir or get_cache_dir()
-    for filename in MODEL_REGISTRY:
-        ensure_model(filename, cache)
-    return cache
+[tool.hatch.build.targets.wheel]
+packages = ["src/docreader"]
