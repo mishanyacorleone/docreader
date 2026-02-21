@@ -1,0 +1,50 @@
+from dataclasses import dataclass, field
+from typing import Optional
+
+import numpy as np
+
+
+@dataclass
+class ZoneResult:
+    """
+    Результат распознавания одного поля документа
+    """
+    name: str
+    text: str
+    confidence: float
+    bbox: list[float] = field(default_factory=list)
+    crop_image: Optional[np.ndarray] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "text": self.text,
+            "confidence": round(self.confidence, 4)
+        }
+    
+
+@dataclass
+class DocumentResult:
+    """
+    Результат обработки одного документа
+    """
+    doc_type: str
+    doc_confidence: float
+    zones: list[ZoneResult] = field(default_factory=list)
+
+    @property
+    def fields(self) -> dict[str, str]:
+        """
+        Словарь: {имя_зоны: распознанный_текст}
+        """ 
+        return {zone.name: zone.text for zone in self.zones}
+    
+    def to_dict(self) -> dict:
+        return {
+            "document": {
+                "doc_type": self.doc_type,
+                "doc_confidence": round(self.doc_confidence, 4),
+                "zones": [zone.to_dict() for zone in self.zones],
+                "fields": self.fields
+            }
+        }
