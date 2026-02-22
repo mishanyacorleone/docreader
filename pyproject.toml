@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "docreader"
+name = "docreader-ocr"
 version = "0.1.2"
 description = "Document OCR pipeline: classify → detect fields → recognize text"
 readme = "README.md"
