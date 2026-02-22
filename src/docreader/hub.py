@@ -16,32 +16,32 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL = "https://github.com/yourname/docreader/releases/download/v0.1.0"
+_BASE_URL = "https://github.com/mishanyacorleone/docreader/releases/download/v0.1.0"
 
 MODEL_REGISTRY: dict[str, dict] = {
     "best_doc_classifier.pth": {
         "url": f"{_BASE_URL}/best_doc_classifier.pth",
-        "sha256": "sha256:6d56f45bd33f5296f40bbf32c67a46c01914a3ac7a3dcbbf9aa9a0b8402b59c4",
+        "sha256": "6d56f45bd33f5296f40bbf32c67a46c01914a3ac7a3dcbbf9aa9a0b8402b59c4",
         "size_mb": 8.75,
     },
     "passport.pt": {
         "url": f"{_BASE_URL}/passport.pt",
-        "sha256": "sha256:bebe46bcd4270442c1e14e9b5a403c9f59212d92ed8181af1326f9f80bc0f0c0",
+        "sha256": "bebe46bcd4270442c1e14e9b5a403c9f59212d92ed8181af1326f9f80bc0f0c0",
         "size_mb": 5.55,
     },
     "diplom.pt": {
         "url": f"{_BASE_URL}/diplom.pt",
-        "sha256": "sha256:f1848733eefa4741ead199cf8226e2fc141b08b01d625912d19926bb7ebc6387",
+        "sha256": "f1848733eefa4741ead199cf8226e2fc141b08b01d625912d19926bb7ebc6387",
         "size_mb": 5.71,
     },
     "attestat.pt": {
         "url": f"{_BASE_URL}/attestat.pt",
-        "sha256": "sha256:9b6eaa5860b0cb0498995c0ab8015a9b85a9a910b429f2bef509e1202232199d",
+        "sha256": "9b6eaa5860b0cb0498995c0ab8015a9b85a9a910b429f2bef509e1202232199d",
         "size_mb": 5.72,
     },
     "snils.pt": {
         "url": f"{_BASE_URL}/snils.pt",
-        "sha256": "sha256:84775a6ff1ababb3f8e31a8aa768717cf9d65d8b84df9c0cd48eb7bdaf680218",
+        "sha256": "84775a6ff1ababb3f8e31a8aa768717cf9d65d8b84df9c0cd48eb7bdaf680218",
         "size_mb": 5.82,
     },
 }

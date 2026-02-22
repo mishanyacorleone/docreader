@@ -49,8 +49,16 @@ class MobileNetClassifier(BaseClassifier):
         return net
 
     def _load_weights(self, path: str) -> None:
-        state_dict = torch.load(path, map_location=self._device)
-        self._model.load_state_dict(state_dict)
+        state_dict = torch.load(path, map_location=self._device, weights_only=False)
+        new_state_dict = {}
+        for key, value in state_dict.items():
+            if key.startswith("net."):
+                new_key = key[4:]  # Убираем первые 4 символа "net."
+            else:
+                new_key = key
+            new_state_dict[new_key] = value
+
+        self._model.load_state_dict(new_state_dict)
         self._model.to(self._device)
         self._model.eval()
 

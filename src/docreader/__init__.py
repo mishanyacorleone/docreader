@@ -11,7 +11,7 @@ DocReader - библиотека для распознавания текста 
 """
 
 from docreader.pipeline import DocReader
-from docreader.src.docreader.schemas import DocumentResult, ZoneResult
+from docreader.schemas import DocumentResult, ZoneResult
 
 __all__ = ["DocReader", "DocumentResult", "ZoneResult"]
 __version__ = "0.1.0"

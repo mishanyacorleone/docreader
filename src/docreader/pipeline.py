@@ -10,15 +10,15 @@ from pathlib import Path
 import numpy as np
 
 from docreader.config import PipelineConfig
-from docreader.src.docreader.schemas import DocumentResult, ZoneResult
+from docreader.schemas import DocumentResult, ZoneResult
 from docreader.utils import load_image
 from docreader.hub import ensure_model, get_cache_dir
-from docreader.preprocessing import descew_image, crop_obb_region
+from docreader.preprocessing import deskew_image, crop_obb_region
 
 from docreader.classifier.base import BaseClassifier
 from docreader.classifier.mobilenet import MobileNetClassifier
 
-from docreader.detector.base import BaseDetection
+from docreader.detector.base import BaseDetector
 from docreader.detector.yolo_obb import YoloObbDetector
 
 from docreader.ocr.base import BaseOcrEngine
@@ -58,7 +58,7 @@ class DocReader:
         models_dir: str,
         config: Optional[PipelineConfig] = None,
         classifier: Optional[BaseClassifier] = None,
-        detector: Optional[BaseDetection] = None,
+        detector: Optional[BaseDetector] = None,
         ocr_engine: Optional[BaseOcrEngine] = None
     ):
         """
@@ -83,11 +83,11 @@ class DocReader:
                     f"models_dir={self._models_dir}"
                     f"auto_download={self._auto_download}")
 
-        self._classifier = classifier or self._default_classifier()
-        self._detector = detector or self._default_detector()
-        self._ocr = ocr_engine or self._default_ocr()
+        self._classifier = classifier or self._init_classifier()
+        self._detector = detector or self._init_detector()
+        self._ocr = ocr_engine or self._init_ocr()
 
-    def _resolve_weigths(self, filename: str) -> str:
+    def _resolve_weights(self, filename: str) -> str:
         """
         Возвращает путь к весам, скачивая при необходимости
         """
@@ -101,19 +101,19 @@ class DocReader:
     def _init_classifier(self) -> BaseClassifier:
         from docreader.classifier.mobilenet import MobileNetClassifier
 
-        weigths = self._resolve_weigths(self._config.classification_weights)
+        weigths = self._resolve_weights(self._config.classification_weights)
         return MobileNetClassifier(
             weights_path=weigths,
             class_labels=self._config.class_labels,
             device=self._device
         )
     
-    def _init_detector(self) -> BaseDetection:
+    def _init_detector(self) -> BaseDetector:
         from docreader.detector.yolo_obb import YoloObbDetector
 
         resolved = {}
         for doc_type, filename in self._config.detector_weights.items():
-            self._resolve_weigths(filename)
+            self._resolve_weights(filename)
             resolved[doc_type] = filename
         
         return YoloObbDetector(
@@ -151,9 +151,9 @@ class DocReader:
         logger.info(f"Classificated as '{doc_type}' (conf={doc_conf:.3f})")
         
         if self._config.enable_descew:
-            image = descew_image(image)
+            image = deskew_image(image)
 
-        detections = self._detector(image, doc_type)
+        detections = self._detector.detect(image, doc_type)
         logger.info(f"Detected {len(detections)} zones")
 
         zones: list[ZoneResult] = []

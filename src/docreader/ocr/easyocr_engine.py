@@ -1,6 +1,7 @@
 """OCR-движок на основе EasyOCR."""
 
 from typing import Optional
+from pathlib import Path
 
 import numpy as np
 import easyocr
@@ -28,13 +29,19 @@ class EasyOcrEngine(BaseOcrEngine):
         user_network_directory: Optional[str] = None,
         recog_network: Optional[str] = None,
     ):
+        # Путь для хранения моделей по умолчанию
+        if model_storage_directory is None:
+            model_storage_directory = str(Path.home() / ".cache" / "docreader" / "easyocr_models")
+            Path(model_storage_directory).mkdir(parents=True, exist_ok=True)
+
         kwargs = {
             "lang_list": lang or ["ru"],
             "gpu": gpu,
-            "download_enabled": False,
+            "download_enabled": True,  # ✅ Включаем загрузку
+            "model_storage_directory": model_storage_directory,  # ✅ Всегда указываем
+            "verbose": False,
         }
-        if model_storage_directory:
-            kwargs["model_storage_directory"] = model_storage_directory
+
         if user_network_directory:
             kwargs["user_network_directory"] = user_network_directory
         if recog_network:

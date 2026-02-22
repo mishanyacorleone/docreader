@@ -26,14 +26,14 @@ class PipelineConfig:
     classification_weights: str = "best_doc_classifier.pth"
 
     class_labels: list[str] = field(default_factory=lambda: [
-        "attestat", "diplom", "passport", "snils"
+        "attestat", "diplom", "passport", "snils", 'other'
     ])
 
     skip_ocr_zones: frozenset[str] = DEFAULT_SKIP_OCR_ZONES 
 
-    enable_descew: bool = True # Выравнивание по линиям Хафа
+    enable_descew: bool = True  # Выравнивание по линиям Хафа
 
-    return_crops: bool = True # Сохранять кропы зон в результат
+    return_crops: bool = True  # Сохранять кропы зон в результат
 
     def resolve_device(self) -> str:
         if self.device != "auto":

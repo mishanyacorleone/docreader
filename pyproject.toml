@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docreader"
-version = "0.1.0"
+version = "0.1.1"
 description = "Document OCR pipeline: classify → detect fields → recognize text"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
 authors = [
     {name = "Mikhail Kardash", email = "mishutqac@mail.com"},
-    {name = "Abzelilov Ruslan", email = "ruslanr26@mail.ru"},
+    {name = "Ruslan Abzelilov", email = "ruslanr26@mail.ru"},
     {name = "Ekaterina Karmanova", email = "monitor81@mail.ru"}
 ]
 keywords = ["ocr", "document", "recognition", "passport", "yolo"]
