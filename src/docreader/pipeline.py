@@ -55,7 +55,7 @@ class DocReader:
 
     def __init__(
         self,
-        models_dir: str,
+        models_dir: str | None,
         config: Optional[PipelineConfig] = None,
         classifier: Optional[BaseClassifier] = None,
         detector: Optional[BaseDetector] = None,
@@ -187,7 +187,7 @@ class DocReader:
         for det in detections:
             zone = self._process_zone(image, det, save_crops)
             if zone is not None:
-                zone.append(zones)
+                zones.append(zone)
         
         return DocumentResult(
             doc_type=doc_type,
