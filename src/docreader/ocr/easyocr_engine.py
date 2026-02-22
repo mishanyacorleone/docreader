@@ -28,6 +28,7 @@ class EasyOcrEngine(BaseOcrEngine):
         model_storage_directory: Optional[str] = None,
         user_network_directory: Optional[str] = None,
         recog_network: Optional[str] = None,
+        download_enabled: bool = False
     ):
         # Путь для хранения моделей по умолчанию
         if model_storage_directory is None:
@@ -37,8 +38,8 @@ class EasyOcrEngine(BaseOcrEngine):
         kwargs = {
             "lang_list": lang or ["ru"],
             "gpu": gpu,
-            "download_enabled": True,  # ✅ Включаем загрузку
-            "model_storage_directory": model_storage_directory,  # ✅ Всегда указываем
+            "download_enabled": download_enabled,
+            "model_storage_directory": model_storage_directory,
             "verbose": False,
         }
 

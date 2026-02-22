@@ -123,7 +123,17 @@ class DocReader:
 
     def _init_ocr(self) -> BaseOcrEngine:
         from docreader.ocr.easyocr_engine import EasyOcrEngine
-        return EasyOcrEngine(lang=["ru"], gpu=(self._device != "cpu"))
+
+        easyocr_dir = ensure_model("easyocr_custom.tar.gz", self._models_dir) 
+
+        return EasyOcrEngine(
+            lang=["ru"],
+            gpu=(self._device != "cpu"),
+            model_storage_directory=str(easyocr_dir / "model"),
+            user_network_directory=str(easyocr_dir / "user_network"),
+            recog_network="custom_example",
+            download_enabled=False
+        )
     
     # Публичный API
 
@@ -143,14 +153,31 @@ class DocReader:
             DocumentResult
         """
 
-        save_crops = return_crops if return_crops is not None else self._config.return_crops
+        save_crops = (
+            return_crops 
+            if return_crops is not None 
+            else self._config.return_crops
+        )
         image = load_image(source)
 
         # 1. Классификация
         doc_type, doc_conf = self._classifier.predict(image)
         logger.info(f"Classificated as '{doc_type}' (conf={doc_conf:.3f})")
         
-        if self._config.enable_descew:
+        supported = self._config.detector_weights.keys()
+        if doc_type not in supported:
+            logger.warning(
+                f"Unknown doc_type '{doc_type}', "
+                f"supported: {list(supported)}. "
+                f"Returning empty result."
+            )
+            return DocumentResult(
+                doc_type=doc_type,
+                doc_confidence=doc_conf,
+                zones=[]
+            )
+
+        if self._config.enable_deskew:
             image = deskew_image(image)
 
         detections = self._detector.detect(image, doc_type)

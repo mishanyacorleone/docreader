@@ -29,9 +29,13 @@ class PipelineConfig:
         "attestat", "diplom", "passport", "snils", 'other'
     ])
 
+    # EasyOCR
     skip_ocr_zones: frozenset[str] = DEFAULT_SKIP_OCR_ZONES 
+    ocr_lang: list[str] = field(default_factory=lambda: ["ru"])
+    ocr_recog_network: str = "custom_example"
+    ocr_download_enabled: bool = False
 
-    enable_descew: bool = True  # Выравнивание по линиям Хафа
+    enable_deskew: bool = True  # Выравнивание по линиям Хафа
 
     return_crops: bool = True  # Сохранять кропы зон в результат
 

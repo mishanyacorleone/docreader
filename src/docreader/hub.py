@@ -8,6 +8,7 @@
 import os
 import hashlib
 import logging
+import tarfile
 from pathlib import Path
 from typing import Optional
 
@@ -44,6 +45,12 @@ MODEL_REGISTRY: dict[str, dict] = {
         "sha256": "84775a6ff1ababb3f8e31a8aa768717cf9d65d8b84df9c0cd48eb7bdaf680218",
         "size_mb": 5.82,
     },
+    "easyocr_custom.tar.gz": {
+        "url": f"{_BASE_URL}/easyocr_custom.tar.gz",
+        "sha256": "832ce5a7f3a1086d81beb1c991347e3f545a425646bc87f3f576ae06fecd2420",
+        "size_mb": 87.1,
+        "extract_to": "easyocr"
+    }
 }
 
 def get_cache_dir() -> Path:
@@ -97,6 +104,18 @@ def _download_file(url: str, dest: Path, expected_sha256: Optional[str] = None):
     logger.info(f"Saved to {dest}")
 
 
+def _extract_archive(archive_path: Path, extract_to: Path):
+    """Распаковывает tar.gz архив."""
+    logger.info(f"Extracting {archive_path.name} → {extract_to}")
+    extract_to.mkdir(parents=True, exist_ok=True)
+
+    with tarfile.open(archive_path, "r:gz") as tar:
+        tar.extractall(path=extract_to)
+
+    archive_path.unlink()
+    logger.info(f"Extracted and cleaned up: {archive_path.name}")
+
+
 def ensure_model(filename: str, cache_dir: Optional[Path] = None) -> Path:
     """
     Гарантирует наличие файла модели. Скачивает, если отсутствует.
@@ -119,13 +138,33 @@ def ensure_model(filename: str, cache_dir: Optional[Path] = None) -> Path:
         )
 
     cache = cache_dir or get_cache_dir()
+    meta = MODEL_REGISTRY[filename]
+
+    if "extract_to" in meta:
+        extract_dir = cache / meta["extract_to"]
+        if extract_dir.exists() and any(extract_dir.iterdir()):
+            logger.debug(f"Already extracted: {extract_dir}")
+            return extract_dir
+        
+        # Скачиваем и распаковываем
+        archive_path = cache / filename
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        _download_file(
+            url=meta["url"],
+            dest=archive_path,
+            expected_sha256=meta.get("sha256")
+        )
+        _extract_archive(archive_path, extract_dir)
+        
+        return extract_dir
+    
     filepath = cache / filename
+    filepath.parent.mkdir(parents=True, exist_ok=True)
 
     if filepath.exists():
         logger.debug(f"Model cached: {filepath}")
         return filepath
 
-    meta = MODEL_REGISTRY[filename]
     _download_file(
         url=meta["url"],
         dest=filepath,

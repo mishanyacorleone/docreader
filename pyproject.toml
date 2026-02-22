@@ -14,7 +14,7 @@ authors = [
     {name = "Ruslan Abzelilov", email = "ruslanr26@mail.ru"},
     {name = "Ekaterina Karmanova", email = "monitor81@mail.ru"}
 ]
-keywords = ["ocr", "document", "recognition", "passport", "yolo"]
+keywords = ["ocr", "document", "recognition", "yolo"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
