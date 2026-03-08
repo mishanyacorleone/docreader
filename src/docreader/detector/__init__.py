@@ -1,4 +1,4 @@
 from docreader.detector.base import BaseDetector, Detection
-from docreader.detector.yolo_obb import YoloObbDetector
+from docreader.detector.yolo_obb import ZoneDetector
 
-__all__ = ["BaseDetector", "Detection", "YoloObbDetector"]
+__all__ = ["BaseDetector", "Detection", "ZoneDetector"]

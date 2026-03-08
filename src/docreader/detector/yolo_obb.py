@@ -1,52 +1,92 @@
-"""Детектор зон документа на основе YOLOv8 OBB."""
+"""Детектор зон документа на основе YOLO OBB."""
 
-import os
+import logging
+
 import numpy as np
 from ultralytics import YOLO
 
 from docreader.detector.base import BaseDetector, Detection
 
+logger = logging.getLogger(__name__)
 
-class YoloObbDetector(BaseDetector):
+
+class ZoneDetector(BaseDetector):
     """
-    Детектор полей документа через YOLOv8 с ориентированными боксами.
+    Детектор полей документа через YOLO OBB с ленивой загрузкой.
+
+    Примеры:
+        det = ZoneDetector(weights_map={
+            "passport": "/path/to/passport.pt",
+            "diplom": "/path/to/diplom.pt",
+        })
+        zones = det.detect(image, doc_type="passport")
 
     Args:
-        models_dir: директория с весами YOLO.
-        weights_map: словарь {тип_документа: имя_файла_весов}.
+        weights_map: словарь {doc_type: полный_путь_к_весам}.
+        device: устройство ("cpu", "cuda").
+        confidence_threshold: минимальная уверенность.
     """
 
-    def __init__(self, models_dir: str, weights_map: dict[str, str]):
-        self._models: dict[str, YOLO] = {}
+    def __init__(
+        self,
+        weights_map: dict[str, str],
+        device: str = "cpu",
+        confidence_threshold: float = 0.25,
+    ):
+        self._weights_map = weights_map
+        self._device = device
+        self._confidence_threshold = confidence_threshold
+        self._loaded_models: dict[str, YOLO] = {}
 
-        for doc_type, filename in weights_map.items():
-            path = os.path.join(models_dir, filename)
-            if not os.path.isfile(path):
-                raise FileNotFoundError(
-                    f"YOLO weights not found: {path} (doc_type={doc_type})"
+        logger.info(
+            f"ZoneDetector initialized: device={self._device}, "
+            f"doc_types={list(self._weights_map.keys())}"
+        )
+
+    def _get_model(self, doc_type: str) -> YOLO:
+        """Загружает модель при первом обращении."""
+        if doc_type not in self._loaded_models:
+            if doc_type not in self._weights_map:
+                raise ValueError(
+                    f"No weights for doc_type='{doc_type}'. "
+                    f"Available: {list(self._weights_map.keys())}"
                 )
-            self._models[doc_type] = YOLO(path)
+            path = self._weights_map[doc_type]
+            logger.info(f"Loading YOLO model for '{doc_type}': {path}")
+            self._loaded_models[doc_type] = YOLO(path)
+        return self._loaded_models[doc_type]
 
     @property
     def supported_doc_types(self) -> list[str]:
-        return list(self._models.keys())
+        """Список поддерживаемых типов документов."""
+        return list(self._weights_map.keys())
 
     def detect(self, image: np.ndarray, doc_type: str) -> list[Detection]:
-        if doc_type not in self._models:
-            raise ValueError(
-                f"No YOLO model for doc_type='{doc_type}'. "
-                f"Available: {self.supported_doc_types}"
-            )
+        """
+        Обнаруживает зоны на изображении документа.
 
-        model = self._models[doc_type]
-        results = model(image)
+        Args:
+            image: BGR изображение (кроп одного документа).
+            doc_type: тип документа.
+
+        Returns:
+            Список Detection.
+        """
+        model = self._get_model(doc_type)
+        results = model(image, device=self._device, verbose=False)
 
         detections = []
+        if results[0].obb is None:
+            return detections
+
         for det in results[0].obb:
-            zone_id = int(det.cls)
+            confidence = float(det.conf.cpu())
+            if confidence < self._confidence_threshold:
+                continue
+
+            zone_id = int(det.cls.cpu())
             zone_name = model.names[zone_id]
             obb_points = det.xyxyxyxy.cpu().numpy().flatten()
-            confidence = float(det.conf.cpu())
 
             detections.append(Detection(
                 zone_name=zone_name,

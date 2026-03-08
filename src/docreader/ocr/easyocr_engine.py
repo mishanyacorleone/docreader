@@ -1,56 +1,75 @@
 """OCR-движок на основе EasyOCR."""
 
+import logging
 from typing import Optional
-from pathlib import Path
 
 import numpy as np
 import easyocr
 
 from docreader.ocr.base import BaseOcrEngine, OcrResult
 
+logger = logging.getLogger(__name__)
 
-class EasyOcrEngine(BaseOcrEngine):
+
+class TextRecognizer(BaseOcrEngine):
     """
-    OCR через EasyOCR (с поддержкой кастомных моделей).
+    OCR через EasyOCR.
+
+    Все пути к моделям передаются явно.
+    Для автоматической загрузки используйте DocReader.
+
+    Примеры:
+        ocr = TextRecognizer(
+            lang=["ru"],
+            model_storage_directory="/path/to/models",
+            user_network_directory="/path/to/networks",
+            recog_network="custom_example",
+        )
+        result = ocr.recognize(image)
 
     Args:
-        lang: список языков, например ["ru"].
-        gpu: использовать GPU.
-        model_storage_directory: путь к директории с моделями.
-        user_network_directory: путь к пользовательским сетям.
+        lang: список языков.
+        gpu: использовать ли GPU.
+        model_storage_directory: директория с моделями.
+        user_network_directory: директория с кастомными сетями.
         recog_network: имя сети распознавания.
+        download_enabled: разрешить скачивание моделей.
     """
 
     def __init__(
         self,
-        lang: list[str] | None = None,
-        gpu: bool = True,
-        model_storage_directory: Optional[str] = None,
-        user_network_directory: Optional[str] = None,
-        recog_network: Optional[str] = None,
-        download_enabled: bool = False
+        lang: list[str],
+        model_storage_directory: str,
+        user_network_directory: str,
+        recog_network: str,
+        gpu: bool = False,
+        download_enabled: bool = False,
     ):
-        # Путь для хранения моделей по умолчанию
-        if model_storage_directory is None:
-            model_storage_directory = str(Path.home() / ".cache" / "docreader" / "easyocr_models")
-            Path(model_storage_directory).mkdir(parents=True, exist_ok=True)
-
-        kwargs = {
-            "lang_list": lang or ["ru"],
+        kwargs: dict = {
+            "lang_list": lang,
             "gpu": gpu,
             "download_enabled": download_enabled,
             "model_storage_directory": model_storage_directory,
+            "user_network_directory": user_network_directory,
+            "recog_network": recog_network,
             "verbose": False,
         }
 
-        if user_network_directory:
-            kwargs["user_network_directory"] = user_network_directory
-        if recog_network:
-            kwargs["recog_network"] = recog_network
-
         self._reader = easyocr.Reader(**kwargs)
+        logger.info(
+            f"TextRecognizer initialized: lang={lang}, gpu={gpu}"
+        )
 
     def recognize(self, image: np.ndarray) -> OcrResult:
+        """
+        Распознаёт текст на изображении.
+
+        Args:
+            image: BGR изображение (кроп зоны).
+
+        Returns:
+            OcrResult с текстом и средней уверенностью.
+        """
         results = self._reader.readtext(image)
 
         if not results:
@@ -63,6 +82,10 @@ class EasyOcrEngine(BaseOcrEngine):
             confidences.append(conf)
 
         combined_text = " ".join(texts).strip()
-        mean_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+        mean_confidence = (
+            sum(confidences) / len(confidences)
+            if confidences
+            else 0.0
+        )
 
         return OcrResult(text=combined_text, confidence=mean_confidence)

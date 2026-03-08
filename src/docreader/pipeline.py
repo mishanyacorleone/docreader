@@ -2,216 +2,206 @@
 Главный пайплайн распознавания документов.
 """
 
-import os
 import logging
-from typing import Optional
-from pathlib import Path
+from typing import Optional, Union
 
 import numpy as np
 
 from docreader.config import PipelineConfig
-from docreader.schemas import DocumentResult, ZoneResult
+from docreader.schemas import DocumentResult, ZoneResult, PageResult
 from docreader.utils import load_image
-from docreader.hub import ensure_model, get_cache_dir
+from docreader.hub import ensure_model
 from docreader.preprocessing import deskew_image, crop_obb_region
 
 from docreader.classifier.base import BaseClassifier
-from docreader.classifier.mobilenet import MobileNetClassifier
 
 from docreader.detector.base import BaseDetector
-from docreader.detector.yolo_obb import YoloObbDetector
 
 from docreader.ocr.base import BaseOcrEngine
-from docreader.ocr.easyocr_engine import EasyOcrEngine
 
 logger = logging.getLogger(__name__)
 
+ImageSource = Union[str, np.ndarray]
+
+
 class DocReader:
     """
-    Распознавание текста с документов
-    
-    Пайплайн:
-        1. Классификация типа документа
-        2. Выравнивание (опционально)
-        3. Детекция полей через YOLO OBB
-        4. Кроп каждой зоны
-        5. OCR каждого кропа
-        6. Сборка результата
+    Полный пайплайн распознавания документов.
 
     Примеры:
-        # Стандартное использование
-        reader = DocReader(models_dir="./models")
-        result = reader.process("passport.jpg")
-        print(result.fields)
+        reader = DocReader()
+        result = reader.process("photo.jpg")
+        for doc in result.documents:
+            print(doc.doc_type, doc.fields)
 
-        # С кастомным OCR-движком
-        my_ocr = MyTesseractEngine()
-        reader = DocReader(models_dir="./models", ocr_engine=my_ocr)
-
-        # С кастомным классификактором
-        my_cls = MyResNetClassifier(weigths="resnet.pth")
-        reader = DocReader(models_dir="./models", classifier=my_cls)
+    Args:
+        config: конфигурация пайплайна.
+        classifier: кастомный классификатор (если None — из конфига).
+        detector: кастомный детектор зон (если None — из конфига).
+        ocr_engine: кастомный OCR-движок (если None — из конфига).
     """
 
     def __init__(
         self,
-        models_dir: str | None,
         config: Optional[PipelineConfig] = None,
         classifier: Optional[BaseClassifier] = None,
         detector: Optional[BaseDetector] = None,
-        ocr_engine: Optional[BaseOcrEngine] = None
+        ocr_engine: Optional[BaseOcrEngine] = None,
     ):
-        """
-        Args:
-            models_dir: директория с файлами моделей
-            config: конфигурация пайплайна
-            classifier: кастомный классификатор (если None - MobileNetV2)
-            detector: кастомный детектор (если None - YOLO OBB)
-            ocr_engine: кастомный OCR (если None - EasyOCR)
-        """
-
         self._config = config or PipelineConfig()
         self._device = self._config.resolve_device()
-        if models_dir is not None:
-            self._models_dir = Path(models_dir)
-            self._auto_download = False
-        else:
-            self._models_dir = get_cache_dir()
-            self._auto_download = True
 
-        logger.info(f"DocReader init: device={self._device}"
-                    f"models_dir={self._models_dir}"
-                    f"auto_download={self._auto_download}")
+        logger.info(f"DocReader init: device={self._device}")
 
-        self._classifier = classifier or self._init_classifier()
-        self._detector = detector or self._init_detector()
-        self._ocr = ocr_engine or self._init_ocr()
+        self._classifier = classifier or self._build_classifier()
+        self._detector = detector or self._build_detector()
+        self._ocr = ocr_engine or self._build_ocr()
 
-    def _resolve_weights(self, filename: str) -> str:
-        """
-        Возвращает путь к весам, скачивая при необходимости
-        """
-        if self._auto_download:
-            return str(ensure_model(filename, self._models_dir))
-        path = self._models_dir / filename
-        if not path.exists():
-            raise FileNotFoundError(f"Model not found: {path}")
-        return str(path)
-    
-    def _init_classifier(self) -> BaseClassifier:
-        from docreader.classifier.mobilenet import MobileNetClassifier
+    def _build_classifier(self) -> BaseClassifier:
+        """Создаёт классификатор из конфига."""
+        from docreader.classifier.yolo_classifier import DocClassifier
 
-        weigths = self._resolve_weights(self._config.classification_weights)
-        return MobileNetClassifier(
-            weights_path=weigths,
-            class_labels=self._config.class_labels,
-            device=self._device
+        weights_path = str(ensure_model(self._config.classifier_weights))
+
+        return DocClassifier(
+            weights_path=weights_path,
+            device=self._device,
+            confidence_threshold=self._config.classifier_confidence,
         )
-    
-    def _init_detector(self) -> BaseDetector:
-        from docreader.detector.yolo_obb import YoloObbDetector
 
-        resolved = {}
+    def _build_detector(self) -> BaseDetector:
+        """Создаёт детектор зон из конфига."""
+        from docreader.detector.yolo_obb import ZoneDetector
+
+        weights_map = {}
         for doc_type, filename in self._config.detector_weights.items():
-            self._resolve_weights(filename)
-            resolved[doc_type] = filename
-        
-        return YoloObbDetector(
-            models_dir=str(self._models_dir),
-            weights_map=resolved
+            weights_map[doc_type] = str(ensure_model(filename))
+
+        return ZoneDetector(
+            weights_map=weights_map,
+            device=self._device,
+            confidence_threshold=self._config.detector_confidence,
         )
 
-    def _init_ocr(self) -> BaseOcrEngine:
-        from docreader.ocr.easyocr_engine import EasyOcrEngine
+    def _build_ocr(self) -> BaseOcrEngine:
+        """Создаёт OCR-движок из конфига."""
+        from docreader.ocr.easyocr_engine import TextRecognizer
 
-        easyocr_dir = ensure_model("easyocr_custom.tar.gz", self._models_dir) 
+        easyocr_dir = ensure_model(self._config.ocr_model_archive)
 
-        return EasyOcrEngine(
-            lang=["ru"],
+        return TextRecognizer(
+            lang=self._config.ocr_lang,
             gpu=(self._device != "cpu"),
-            model_storage_directory=str(easyocr_dir / "model"),
-            user_network_directory=str(easyocr_dir / "user_network"),
-            recog_network="custom_example",
-            download_enabled=False
+            model_storage_directory=str(
+                easyocr_dir / self._config.ocr_model_subdir
+            ),
+            user_network_directory=str(
+                easyocr_dir / self._config.ocr_network_subdir
+            ),
+            recog_network=self._config.ocr_recog_network,
+            download_enabled=self._config.ocr_download_enabled,
         )
-    
-    # Публичный API
+
+    # === Публичный API ===
 
     def process(
         self,
-        source,
+        source: ImageSource,
         return_crops: Optional[bool] = None,
-    ) -> DocumentResult:
+    ) -> PageResult:
         """
-        Полный пайплайн распознавания документа.
+        Полный пайплайн: находит все документы и распознаёт.
 
         Args:
-            source: путь к файлу или numpy array (BGR)
-            return_crops: сохранять ли кропы зон в результат
-        
-        Returns:
-            DocumentResult
-        """
+            source: путь к файлу или numpy array (BGR).
+            return_crops: сохранять ли кропы.
 
+        Returns:
+            PageResult со списком найденных документов.
+        """
         save_crops = (
-            return_crops 
-            if return_crops is not None 
+            return_crops
+            if return_crops is not None
             else self._config.return_crops
         )
+
         image = load_image(source)
 
         # 1. Классификация
-        doc_type, doc_conf = self._classifier.predict(image)
-        logger.info(f"Classificated as '{doc_type}' (conf={doc_conf:.3f})")
-        
-        supported = self._config.detector_weights.keys()
-        if doc_type not in supported:
-            logger.warning(
-                f"Unknown doc_type '{doc_type}', "
-                f"supported: {list(supported)}. "
-                f"Returning empty result."
+        classified_docs = self._classifier.classify(image)
+
+        if not classified_docs:
+            logger.info("No documents found")
+            return PageResult(documents=[])
+
+        # 2. Обработка каждого документа
+        documents: list[DocumentResult] = []
+        for doc in classified_docs:
+            result = self._process_single_document(
+                doc_image=doc.crop,
+                doc_type=doc.doc_type,
+                doc_confidence=doc.confidence,
+                doc_bbox=doc.obb_points,
+                save_crops=save_crops,
             )
+            documents.append(result)
+
+        page_result = PageResult(documents=documents)
+        logger.info(f"Complete: {page_result}")
+        return page_result
+
+    def process_batch(
+        self,
+        sources: list[ImageSource],
+        return_crops: Optional[bool] = None,
+    ) -> list[PageResult]:
+        """Обработка нескольких фотографий."""
+        return [self.process(src, return_crops) for src in sources]
+
+    # === Внутренняя логика ===
+
+    def _process_single_document(
+        self,
+        doc_image: np.ndarray,
+        doc_type: str,
+        doc_confidence: float,
+        doc_bbox: np.ndarray,
+        save_crops: bool,
+    ) -> DocumentResult:
+        """Обрабатывает один документ."""
+
+        if doc_type not in self._detector.supported_doc_types:
+            logger.warning(f"No detector for '{doc_type}'")
             return DocumentResult(
                 doc_type=doc_type,
-                doc_confidence=doc_conf,
-                zones=[]
+                doc_confidence=doc_confidence,
+                zones=[],
+                doc_bbox=doc_bbox.tolist(),
+                doc_crop=doc_image if save_crops else None,
             )
 
         if self._config.enable_deskew:
-            image = deskew_image(image)
+            doc_image = deskew_image(doc_image)
 
-        detections = self._detector.detect(image, doc_type)
-        logger.info(f"Detected {len(detections)} zones")
+        detections = self._detector.detect(doc_image, doc_type)
+        logger.info(f"'{doc_type}': {len(detections)} zones")
 
         zones: list[ZoneResult] = []
         for det in detections:
-            zone = self._process_zone(image, det, save_crops)
+            zone = self._process_zone(doc_image, det, save_crops)
             if zone is not None:
                 zones.append(zone)
-        
+
         return DocumentResult(
             doc_type=doc_type,
-            doc_confidence=doc_conf,
-            zones=zones
+            doc_confidence=doc_confidence,
+            zones=zones,
+            doc_bbox=doc_bbox.tolist(),
+            doc_crop=doc_image if save_crops else None,
         )
-    
-    def process_batch(
-        self,
-        sources: list,
-        return_crops: Optional[bool] = None 
-    ) -> list[DocumentResult]:
-        """
-        Обработка нескольких документов
-        """
-        return [self.process(src, return_crops) for src in sources]
-    
-    # Внутренняя логика
-    
+
     def _process_zone(self, image, detection, save_crops):
-        """
-        Обрабатывает одну зону: кроп -> OCR -> ZoneResult
-        """
-        from docreader.detector.base import Detection
+        """Обрабатывает одну зону."""
 
         zone_name = detection.zone_name
 
@@ -221,15 +211,13 @@ class DocReader:
                 text="",
                 confidence=detection.confidence,
                 bbox=detection.obb_points.tolist(),
-                crop_image=None
             )
-        
+
         crop = crop_obb_region(image, detection.obb_points)
         if crop is None or crop.size == 0:
-            logger.warning(f"Empty crop for zone: '{zone_name}', skipping")
+            logger.warning(f"Empty crop for '{zone_name}'")
             return None
 
-        
         ocr_result = self._ocr.recognize(crop)
 
         return ZoneResult(
@@ -237,6 +225,24 @@ class DocReader:
             text=ocr_result.text,
             confidence=ocr_result.confidence,
             bbox=detection.obb_points.tolist(),
-            crop_image=crop if save_crops else None
+            crop_image=crop if save_crops else None,
         )
-    
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def close(self):
+        """Освобождает ресурсы."""
+        self._classifier = None
+        self._detector = None
+        self._ocr = None
+        try:
+            import gc
+            gc.collect()
+            import torch
+            torch.cuda.empty_cache()
+        except ImportError:
+            pass

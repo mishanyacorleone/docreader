@@ -20,11 +20,14 @@ logger = logging.getLogger(__name__)
 _BASE_URL = "https://github.com/mishanyacorleone/docreader/releases/download/v0.1.0"
 
 MODEL_REGISTRY: dict[str, dict] = {
-    "best_doc_classifier.pth": {
-        "url": f"{_BASE_URL}/best_doc_classifier.pth",
+    # === Классификатор документов (YOLO OBB) ===
+    "doc_classifier.pt": {
+        "url": f"{_BASE_URL}/doc_classifier.pth",
         "sha256": "6d56f45bd33f5296f40bbf32c67a46c01914a3ac7a3dcbbf9aa9a0b8402b59c4",
         "size_mb": 8.75,
     },
+
+    # === Детекторы зон ===
     "passport.pt": {
         "url": f"{_BASE_URL}/passport.pt",
         "sha256": "bebe46bcd4270442c1e14e9b5a403c9f59212d92ed8181af1326f9f80bc0f0c0",
@@ -45,6 +48,8 @@ MODEL_REGISTRY: dict[str, dict] = {
         "sha256": "84775a6ff1ababb3f8e31a8aa768717cf9d65d8b84df9c0cd48eb7bdaf680218",
         "size_mb": 5.82,
     },
+
+    # === EasyOCR ===
     "easyocr_custom.tar.gz": {
         "url": f"{_BASE_URL}/easyocr_custom.tar.gz",
         "sha256": "832ce5a7f3a1086d81beb1c991347e3f545a425646bc87f3f576ae06fecd2420",
@@ -180,3 +185,45 @@ def ensure_all_models(cache_dir: Optional[Path] = None) -> Path:
     for filename in MODEL_REGISTRY:
         ensure_model(filename, cache)
     return cache
+
+
+def get_model_paths() -> dict[str, Path]:
+    """
+    Возвращает словарь {имя_модели: полный_путь}
+    для всех зарегистрированных моделей.
+    """
+    cache = get_cache_dir()
+    paths = {}
+
+    for filename, meta in MODEL_REGISTRY.items():
+        if "extract_to" in meta:
+            paths[filename] = cache / meta["extract_to"]
+        else:
+            paths[filename] = cache / filename
+
+    return paths
+
+
+def get_model_status() -> dict[str, dict]:
+    """
+    Показывает статус всех моделей: путь, скачана ли, размер.
+    """
+    cache = get_cache_dir()
+    status = {}
+
+    for filename, meta in MODEL_REGISTRY.items():
+        if "extract_to" in meta:
+            path = cache / meta["extract_to"]
+            exists = path.exists() and any(path.iterdir())
+        else:
+            path = cache / filename
+            exists = path.exists()
+
+        status[filename] = {
+            "path": str(path),
+            "downloaded": exists,
+            "size_mb": meta.get("size_mb", "?"),
+            "url": meta["url"],
+        }
+
+    return status

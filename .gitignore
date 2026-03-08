@@ -64,3 +64,11 @@ htmlcov/
 .env
 .env.local
 output/
+
+# ══════════════════════════════════════════
+# Tests
+# ══════════════════════════════════════════ 
+
+tests/*.jpg
+tests/*.png
+tests/*.jpeg

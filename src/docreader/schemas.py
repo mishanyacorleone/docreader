@@ -31,6 +31,8 @@ class DocumentResult:
     doc_type: str
     doc_confidence: float
     zones: list[ZoneResult] = field(default_factory=list)
+    doc_bbox: Optional[list[float]] = None # координаты документа в исходном изображении
+    doc_crop: Optional[np.ndarray] = None # кроп документа
 
     @property
     def fields(self) -> dict[str, str]:
@@ -48,3 +50,33 @@ class DocumentResult:
                 "fields": self.fields
             }
         }
+    
+    def __repr__(self) -> str:
+        return (
+            f"DocumentResult(doc_type='{self.doc_type}', "
+            f"confidence={self.doc_confidence:.3f}, "
+            f"zones={len(self.zones)})"
+        )
+    
+
+@dataclass
+class PageResult:
+    """
+    Результат обработки одной страницы/фотографии.
+    Может содержать несколько документов.
+    """
+    documents: list[DocumentResult] = field(default_factory=list)
+
+    @property
+    def count(self) -> int:
+        return len(self.documents)
+    
+    def to_dict(self) -> dict:
+        return {
+            "documents": [doc.to_dict() for doc in self.documents],
+            "total": self.count
+        }
+    
+    def __repr__(self) -> str:
+        types = [d.doc_type for d in self.documents]
+        return f"PageResult(documents={self.count}, types={types})"
