@@ -29,8 +29,8 @@ class PipelineConfig:
     # EasyOCR
     ocr_lang: list[str] = field(default_factory=lambda: ["ru"])
     ocr_model_archive: str = "easyocr_custom.tar.gz"
-    ocr_model_subdir: str = "model",
-    ocr_network_subdir: str = "user_network",
+    ocr_model_subdir: str = "model"
+    ocr_network_subdir: str = "user_network"
     ocr_recog_network: str = "custom_example"
     ocr_download_enabled: bool = False
     skip_ocr_zones: frozenset[str] = DEFAULT_SKIP_OCR_ZONES 

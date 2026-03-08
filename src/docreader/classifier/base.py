@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Union
 
 import numpy as np
 
@@ -26,12 +27,12 @@ class BaseClassifier(ABC):
     """
 
     @abstractmethod
-    def classify(self, image: np.ndarray) -> list[str, float]:
+    def classify(self, source: Union[str, np.ndarray]) -> list[str, float]:
         """
         Классифицирует изображение документа.
 
         Args:
-            image: BGR изображение (numpy array).
+            image: путь к файлу или BGR изображение (numpy array).
 
         Returns:
             Кортеж (метка_класса, уверенность).

@@ -87,7 +87,7 @@ def create_detector(
         "confidence_threshold": cfg.detector_confidence,
     }
     defaults.update(kwargs)
-    return ZoneDetector(**kwargs)
+    return ZoneDetector(**defaults)
 
 
 def create_ocr(
@@ -126,4 +126,4 @@ def create_ocr(
         "download_enabled": cfg.ocr_download_enabled,
     }
     defaults.update(kwargs)
-    return TextRecognizer(**kwargs)
+    return TextRecognizer(**defaults)

@@ -1,13 +1,14 @@
 """Классификатор документов на основе YOLO OBB."""
 
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 from ultralytics import YOLO
 
 from docreader.classifier.base import BaseClassifier, ClassifiedDocument
 from docreader.preprocessing.geometry import crop_obb_region
+from docreader.utils import load_image
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class DocClassifier(BaseClassifier):
             f"classes={list(self._model.names.values())}"
         )
 
-    def classify(self, image: np.ndarray) -> list[ClassifiedDocument]:
+    def classify(self, source: Union[str, np.ndarray]) -> list[ClassifiedDocument]:
         """
         Находит документы на изображении.
 
@@ -60,6 +61,8 @@ class DocClassifier(BaseClassifier):
         Returns:
             Список ClassifiedDocument. Пустой, если документы не найдены.
         """
+        image = load_image(source)
+        
         results = self._model(image, device=self._device, verbose=False)
 
         documents = []
