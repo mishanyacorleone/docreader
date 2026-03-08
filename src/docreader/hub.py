@@ -23,8 +23,8 @@ MODEL_REGISTRY: dict[str, dict] = {
     # === Классификатор документов (YOLO OBB) ===
     "doc_classifier.pt": {
         "url": f"{_BASE_URL}/doc_classifier.pth",
-        "sha256": "6d56f45bd33f5296f40bbf32c67a46c01914a3ac7a3dcbbf9aa9a0b8402b59c4",
-        "size_mb": 8.75,
+        "sha256": "b1af689fe58849474a6a5cf879458fcba6d017233ca1bd54b5d83098cd9387f5",
+        "size_mb": 5.49,
     },
 
     # === Детекторы зон ===
