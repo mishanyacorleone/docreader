@@ -21,9 +21,13 @@
 # print(f"📄 Тип документа: {result.doc_type}")
 # print(f"🔍 Поля: {result.fields}")
 
-from docreader import DocReader
+from docreader import create_detector, create_classifier, create_ocr
 
-reader = DocReader()
-result = reader.process("/mnt/mishutqa/PycharmProjects/sirius/docreader/tests/2-4-_jpg.rf.0f2c4d41aca84c3aa35969658498e905.jpg")
-for doc in result.documents:
-    print(doc.zones)
+# clf = create_classifier()
+# res = clf.classify("/mnt/mishutqa/PycharmProjects/sirius/docreader/tests/1cb43a27a0baa9ba3bd003bdca1c3cd2_png.rf.556fec7fcd33c49b265283a3bdb79552.jpg")
+# for doc in res:
+#     print(doc.doc_type)
+
+det = create_detector()
+res = det.detect("/mnt/mishutqa/PycharmProjects/sirius/docreader/tests/1cb43a27a0baa9ba3bd003bdca1c3cd2_png.rf.556fec7fcd33c49b265283a3bdb79552.jpg", doc_type="passport")
+print(res)

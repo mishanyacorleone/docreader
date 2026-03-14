@@ -17,15 +17,15 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL_CLASSIFIER = "https://github.com/mishanyacorleone/docreader/releases/download/v0.2.0"
+_BASE_URL_CLASSIFIER = "https://github.com/mishanyacorleone/docreader/releases/download/v0.2.1"
 _BASE_URL = "https://github.com/mishanyacorleone/docreader/releases/download/v0.1.0"
 
 MODEL_REGISTRY: dict[str, dict] = {
     # === Классификатор документов (YOLO OBB) ===
     "doc_classifier.pt": {
         "url": f"{_BASE_URL_CLASSIFIER}/doc_classifier.pt",
-        "sha256": "b1af689fe58849474a6a5cf879458fcba6d017233ca1bd54b5d83098cd9387f5",
-        "size_mb": 5.49,
+        "sha256": "sha256:d912884d8517cf776e989dc4fced855f34c2ee1d8b17732b778d7e84b7de84fc",
+        "size_mb": 6.03,
     },
 
     # === Детекторы зон ===
