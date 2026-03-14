@@ -24,7 +24,7 @@ MODEL_REGISTRY: dict[str, dict] = {
     # === Классификатор документов (YOLO OBB) ===
     "doc_classifier.pt": {
         "url": f"{_BASE_URL_CLASSIFIER}/doc_classifier.pt",
-        "sha256": "sha256:d912884d8517cf776e989dc4fced855f34c2ee1d8b17732b778d7e84b7de84fc",
+        "sha256": "d912884d8517cf776e989dc4fced855f34c2ee1d8b17732b778d7e84b7de84fc",
         "size_mb": 6.03,
     },
 
