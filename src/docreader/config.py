@@ -6,6 +6,13 @@ from dataclasses import dataclass, field
 
 DEFAULT_SKIP_OCR_ZONES = frozenset({"stamp", "gerb"})
 
+DEFAULT_AMBIGUOUS_CLASSES = frozenset({"attestat/diplom"})
+
+DEFAULT_SUBTYPE_KEYWORDS: dict[str, list[str]] = {
+    "attestat": ["аттестат"],
+    "diplom": ["диплом"]
+}
+
 
 @dataclass
 class PipelineConfig:
@@ -34,6 +41,18 @@ class PipelineConfig:
     ocr_recog_network: str = "custom_example"
     ocr_download_enabled: bool = False
     skip_ocr_zones: frozenset[str] = DEFAULT_SKIP_OCR_ZONES 
+
+    # Resolver
+    ambiguous_classes: frozenset[str] = field(
+        default_factory=lambda: DEFAULT_AMBIGUOUS_CLASSES
+    )
+    resolver_weights: str = "lvl_detector.pt"
+    resolver_confidence: float = 0.25
+    resolver_subtype_keywords: dict[str, list[str]] = field(
+        default_factory=lambda: dict(DEFAULT_SUBTYPE_KEYWORDS)
+    )
+    resolver_fuzzy_threshold: float = 60.0
+    resolver_fallback: str | None = None
 
     enable_deskew: bool = True  # Выравнивание по линиям Хафа
     return_crops: bool = True  # Сохранять кропы зон в результат

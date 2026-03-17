@@ -33,6 +33,7 @@ class DocumentResult:
     zones: list[ZoneResult] = field(default_factory=list)
     doc_bbox: Optional[list[float]] = None # координаты документа в исходном изображении
     doc_crop: Optional[np.ndarray] = None # кроп документа
+    resolve_meta: dict = field(default_factory=dict) # диагностика resolver'a
 
     @property
     def fields(self) -> dict[str, str]:
@@ -42,7 +43,7 @@ class DocumentResult:
         return {zone.name: zone.text for zone in self.zones}
     
     def to_dict(self) -> dict:
-        return {
+        result = {
             "document": {
                 "doc_type": self.doc_type,
                 "doc_confidence": round(self.doc_confidence, 4),
@@ -50,6 +51,9 @@ class DocumentResult:
                 "fields": self.fields
             }
         }
+        if self.resolve_meta:
+            result["document"]["resolve_meta"] = self.resolve_meta
+        return result
     
     def __repr__(self) -> str:
         return (

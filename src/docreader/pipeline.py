@@ -14,10 +14,9 @@ from docreader.hub import ensure_model
 from docreader.preprocessing import deskew_image, crop_obb_region
 
 from docreader.classifier.base import BaseClassifier
-
 from docreader.detector.base import BaseDetector
-
 from docreader.ocr.base import BaseOcrEngine
+from docreader.resolver.base import BaseSubtypeResolver
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +46,7 @@ class DocReader:
         classifier: Optional[BaseClassifier] = None,
         detector: Optional[BaseDetector] = None,
         ocr_engine: Optional[BaseOcrEngine] = None,
+        subtype_resolver: Optional[BaseSubtypeResolver] = None
     ):
         self._config = config or PipelineConfig()
         self._device = self._config.resolve_device()
@@ -56,6 +56,7 @@ class DocReader:
         self._classifier = classifier or self._build_classifier()
         self._detector = detector or self._build_detector()
         self._ocr = ocr_engine or self._build_ocr()
+        self._resolver = subtype_resolver or self._build_resolver()
 
     def _build_classifier(self) -> BaseClassifier:
         """Создаёт классификатор из конфига."""
@@ -101,6 +102,28 @@ class DocReader:
             recog_network=self._config.ocr_recog_network,
             download_enabled=self._config.ocr_download_enabled,
         )
+    
+    def _build_resolver(self) -> Optional[BaseSubtypeResolver]:
+        """
+        Создаёт resolver только если есть неоднозначные классы в конфиге.
+        Возвращает None, если resolver не нужен
+        """
+        if not self._config.ambiguous_classes:
+            return None
+        
+        from docreader.resolver.lvl_resolver import LvlSubtypeResolver
+
+        weights_path = ensure_model(self._config.resolver_weights)
+
+        return LvlSubtypeResolver(
+            weights_path=weights_path,
+            ocr_engine=self._ocr,
+            subtype_keywords=self._config.resolver_subtype_keywords,
+            fuzzy_threshold=self._config.resolver_fuzzy_threshold,
+            confidence_threshold=self._config.resolver_confidence,
+            fallback=self._config.resolver_fallback,
+            device=self._device,
+        )
 
     # === Публичный API ===
 
@@ -111,11 +134,11 @@ class DocReader:
     ) -> PageResult:
         """
         Полный пайплайн: находит все документы и распознаёт.
-
+ 
         Args:
             source: путь к файлу или numpy array (BGR).
             return_crops: сохранять ли кропы.
-
+ 
         Returns:
             PageResult со списком найденных документов.
         """
@@ -124,17 +147,14 @@ class DocReader:
             if return_crops is not None
             else self._config.return_crops
         )
-
+ 
         image = load_image(source)
-
-        # 1. Классификация
         classified_docs = self._classifier.classify(image)
-
+ 
         if not classified_docs:
             logger.info("No documents found")
             return PageResult(documents=[])
-
-        # 2. Обработка каждого документа
+ 
         documents: list[DocumentResult] = []
         for doc in classified_docs:
             result = self._process_single_document(
@@ -145,11 +165,11 @@ class DocReader:
                 save_crops=save_crops,
             )
             documents.append(result)
-
+ 
         page_result = PageResult(documents=documents)
         logger.info(f"Complete: {page_result}")
         return page_result
-
+ 
     def process_batch(
         self,
         sources: list[ImageSource],
@@ -159,6 +179,45 @@ class DocReader:
         return [self.process(src, return_crops) for src in sources]
 
     # === Внутренняя логика ===
+    
+    def _resolve_doc_type(
+        self,
+        doc_type: str,
+        doc_image: np.ndarray
+    ) -> tuple[str, dict]:
+        """
+        Уточняет тип документа через resolver, если класс неоднозначен.
+
+        Returns:
+            Кортеж (уточнённый doc_type, метаданные resolve).
+        """
+        if (
+            doc_type not in self._config.ambiguous_classes
+            or self._resolver is None
+        ):
+            return doc_type, {}
+
+        resolve_result = self._resolver.resolve(doc_image)
+        meta = {
+            "resolver_ocr_text": resolve_result.ocr_text,
+            "resolver_ocr_confidence": resolve_result.confidence,
+            "resolver_fuzzy_score": resolve_result.fuzzy_score
+        }
+
+        if resolve_result.resolved:
+            logger.info(
+                f"Resolved '{doc_type}' -> '{resolve_result.subtype}' "
+                f"(text='{resolve_result.ocr_text}', "
+                f"fuzzy={resolve_result.fuzzy_score:.1f})"
+            )
+            return resolve_result.subtype, meta
+        
+        logger.warning(
+            f"Could not resolve subtype for '{doc_type}': "
+            f"text='{resolve_result.ocr_text}', "
+            f"score={resolve_result.fuzzy_score:.1f}"
+        )
+        return doc_type, meta
 
     def _process_single_document(
         self,
@@ -169,42 +228,44 @@ class DocReader:
         save_crops: bool,
     ) -> DocumentResult:
         """Обрабатывает один документ."""
-
-        if doc_type not in self._detector.supported_doc_types:
-            logger.warning(f"No detector for '{doc_type}'")
+        if self._config.enable_deskew:
+            doc_image = deskew_image(doc_image)
+ 
+        resolved_type, resolve_meta = self._resolve_doc_type(doc_type, doc_image)
+ 
+        if resolved_type not in self._detector.supported_doc_types:
+            logger.warning(f"No detector for '{resolved_type}'")
             return DocumentResult(
-                doc_type=doc_type,
+                doc_type=resolved_type,
                 doc_confidence=doc_confidence,
                 zones=[],
                 doc_bbox=doc_bbox.tolist(),
                 doc_crop=doc_image if save_crops else None,
+                resolve_meta=resolve_meta,
             )
-
-        if self._config.enable_deskew:
-            doc_image = deskew_image(doc_image)
-
-        detections = self._detector.detect(doc_image, doc_type)
-        logger.info(f"'{doc_type}': {len(detections)} zones")
-
+ 
+        detections = self._detector.detect(doc_image, resolved_type)
+        logger.info(f"'{resolved_type}': {len(detections)} zones")
+ 
         zones: list[ZoneResult] = []
         for det in detections:
             zone = self._process_zone(doc_image, det, save_crops)
             if zone is not None:
                 zones.append(zone)
-
+ 
         return DocumentResult(
-            doc_type=doc_type,
+            doc_type=resolved_type,
             doc_confidence=doc_confidence,
             zones=zones,
             doc_bbox=doc_bbox.tolist(),
             doc_crop=doc_image if save_crops else None,
+            resolve_meta=resolve_meta,
         )
 
     def _process_zone(self, image, detection, save_crops):
         """Обрабатывает одну зону."""
-
         zone_name = detection.zone_name
-
+ 
         if zone_name in self._config.skip_ocr_zones:
             return ZoneResult(
                 name=zone_name,
@@ -212,14 +273,14 @@ class DocReader:
                 confidence=detection.confidence,
                 bbox=detection.obb_points.tolist(),
             )
-
+ 
         crop = crop_obb_region(image, detection.obb_points)
         if crop is None or crop.size == 0:
             logger.warning(f"Empty crop for '{zone_name}'")
             return None
-
+ 
         ocr_result = self._ocr.recognize(crop)
-
+ 
         return ZoneResult(
             name=zone_name,
             text=ocr_result.text,
@@ -239,6 +300,7 @@ class DocReader:
         self._classifier = None
         self._detector = None
         self._ocr = None
+        self._resolver = None
         try:
             import gc
             gc.collect()

@@ -17,6 +17,7 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
+_BASE_LVL_DETECTOR = "https://github.com/mishanyacorleone/docreader/releases/download/v0.2.2"
 _BASE_URL_CLASSIFIER = "https://github.com/mishanyacorleone/docreader/releases/download/v0.2.1"
 _BASE_URL = "https://github.com/mishanyacorleone/docreader/releases/download/v0.1.0"
 
@@ -56,7 +57,14 @@ MODEL_REGISTRY: dict[str, dict] = {
         "sha256": "832ce5a7f3a1086d81beb1c991347e3f545a425646bc87f3f576ae06fecd2420",
         "size_mb": 87.1,
         "extract_to": "easyocr"
-    }
+    },
+
+    # === Resolver ===
+    "lvl_detector.pt": {
+        "url": f"{_BASE_LVL_DETECTOR}/lvl_detector.pt",
+        "sha256": "10bc71dbf8de891bc591154c3c369d8db2daa329249ef4e5b4b15508e8441ba4",
+        "size_mb": 5.63,
+    },
 }
 
 def get_cache_dir() -> Path:

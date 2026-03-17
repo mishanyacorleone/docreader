@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docreader-ocr"
-version = "0.2.3"
+version = "0.2.4"
 description = "Document OCR pipeline: classify → detect fields → recognize text"
 readme = "README.md"
 license = {text = "MIT"}
@@ -32,6 +32,7 @@ dependencies = [
     "numpy>=1.24",
     "requests>=2.28",
     "tqdm>=4.65",
+    "RapidFuzz>=3.14.0"
 ]
 
 [project.optional-dependencies]
