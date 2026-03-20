@@ -33,7 +33,7 @@ class BaseSubtypeResolver(ABC):
     """
 
     @abstractmethod
-    def resolve(self, image: np.ndarray) -> ResolverResult:
+    def resolve(self, image: np.ndarray) -> ResolveResult:
         """
         Определяет подтип документа по его crop'y
         """

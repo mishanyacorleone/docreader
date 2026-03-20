@@ -204,7 +204,7 @@ class DocReader:
             "resolver_fuzzy_score": resolve_result.fuzzy_score
         }
 
-        if resolve_result.resolved:
+        if resolve_result.resolve:
             logger.info(
                 f"Resolved '{doc_type}' -> '{resolve_result.subtype}' "
                 f"(text='{resolve_result.ocr_text}', "
