@@ -69,6 +69,7 @@ output/
 # Tests
 # ══════════════════════════════════════════ 
 
-tests/*.jpg
-tests/*.png
-tests/*.jpeg
+tests/**/*.json
+tests/**/*.jpg
+tests/**/*.png
+tests/**/*.jpeg
