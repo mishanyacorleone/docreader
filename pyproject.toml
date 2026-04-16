@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docreader-ocr"
-version = "0.2.6"
+version = "0.2.7"
 description = "Document OCR pipeline: classify → detect fields → recognize text"
 readme = "README_pypi.md"
 license = {text = "MIT"}

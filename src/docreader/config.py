@@ -54,7 +54,7 @@ class PipelineConfig:
     resolver_fuzzy_threshold: float = 60.0
     resolver_fallback: str | None = None
 
-    enable_deskew: bool = True  # Выравнивание по линиям Хафа
+    enable_deskew: bool = False  # Выравнивание по линиям Хафа
     return_crops: bool = True  # Сохранять кропы зон в результат
 
     def resolve_device(self) -> str:
