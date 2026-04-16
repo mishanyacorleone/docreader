@@ -41,23 +41,16 @@ def deskew_image(image: np.ndarray) -> np.ndarray:
     return cv2.warpAffine(image, rotation_matrix, (w, h))
 
 
-def crop_obb_region(image: np.ndarray, obb_points: np.ndarray) -> np.ndarray | None:
-    """
-    Вырезает область по 4 точкам OBB и выпрямляет перспективу.
+def crop_obb_region(
+    image: np.ndarray,
+    obb_points: np.ndarray,
+    zone_name: str = "",
+) -> np.ndarray | None:
+    
+    # Зоны которые нужно повернуть после кропа
+    ROTATE_CW_ZONES = {"passport_num"}
 
-    Если результат вертикальный (высота > ширина), поворачивает на 90°.
-
-    Args:
-        image: исходное BGR изображение.
-        obb_points: массив из 8 координат [x1,y1,x2,y2,x3,y3,x4,y4]
-                    или shape (4, 2).
-
-    Returns:
-        Выпрямленный кроп или None, если размеры некорректны.
-    """
     pts = np.array(obb_points, dtype=np.float32).reshape(4, 2)
-
-    # Упорядочиваем: top-left, top-right, bottom-right, bottom-left
     rect = _order_points(pts)
     tl, tr, br, bl = rect
 
@@ -81,9 +74,9 @@ def crop_obb_region(image: np.ndarray, obb_points: np.ndarray) -> np.ndarray | N
     matrix = cv2.getPerspectiveTransform(rect, dst)
     warped = cv2.warpPerspective(image, matrix, (width, height))
 
-    # Поворот вертикальных фрагментов
+    # Поворачиваем только конкретные зоны
     h, w = warped.shape[:2]
-    if h > w:
+    if h > w and zone_name in ROTATE_CW_ZONES:
         warped = cv2.rotate(warped, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
     return warped

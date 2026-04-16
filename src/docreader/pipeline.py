@@ -274,7 +274,7 @@ class DocReader:
                 bbox=detection.obb_points.tolist(),
             )
  
-        crop = crop_obb_region(image, detection.obb_points)
+        crop = crop_obb_region(image, detection.obb_points, zone_name=zone_name)
         if crop is None or crop.size == 0:
             logger.warning(f"Empty crop for '{zone_name}'")
             return None
